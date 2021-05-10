@@ -23,7 +23,6 @@
 	(else
 	  (error "Unknown expression type -- EVAL" expr))))
 
-
 ; Evaluates a list of values
 ; Used to reduce application arguments to evaluatable form
 (define (list-of-values exprs env)
@@ -62,20 +61,107 @@
 		    env)
   'ok)
 
+; ----- Analysis -----
+
+;; Separate into analysis and execution
+;(define (evaluate expr env) ((analyze expr) env))
+;
+;(define (analyze expr)
+;  (cond ((self-evaluating? expr)	(analyze-self-evaluating expr))
+;	((quoted? expr)			(analyze-quoted expr))
+;	((variable? expr)		(analyze-variable expr))
+;	((assignment? expr)		(analyze-assignment expr))
+;	((definition? expr)		(analyze-definition expr))
+;	((if? expr)			(analyze-if expr))
+;	((lambda? expr)			(analyze-lambda expr))
+;	((begin? expr)			(analyze-sequence (begin-actions expr)))
+;	((cond? expr)			(analyze (cond->if expr)))
+;	((let? expr)			(analyze (let->combination expr)))
+;	((application? expr)		(analyze-application expr))
+;	(else
+;	  (error "Unknown expression type -- ANALYZE" expr))))
+;
+;(define (analyze-self-evaluating expr)
+;  (lambda (env) expr))
+;
+;(define (analyze-quoted expr)
+;  (let ((qval (text-of-quotation expr)))
+;    (lambda (env) qval)))
+;
+;(define (analyze-variable expr)
+;  (lambda (env) (lookup-variable-value expr env)))
+;
+;(define (analyze-assignment expr)
+;  (let ((var (assignment-variable expr))
+;	(vproc (analyze (assignment-value expr))))
+;    (lambda (env)
+;      (set-variable-value! var (vproc env) env)
+;      'ok)))
+;
+;(define (analyze-definition expr)
+;  (let ((var (definition-variable expr))
+;	(vproc (analyze (definition-value expr))))
+;    (lambda (env)
+;      (define-variable! var (vproc env) env)
+;      'ok)))
+;
+;(define (analyze-if expr)
+;  (let ((pproc (analyze (if-predicate expr)))
+;	(cproc (analyze (if-consequent expr)))
+;	(aproc (analyze (if-alternative expr))))
+;    (lambda (env)
+;      (if (true? (pproc env))
+;	(cproc env)
+;	(aproc env)))))
+;
+;(define (analyze-lambda expr)
+;  (let ((vars (lambda-parameters expr))
+;	(bproc (analyze-sequence (lambda-body expr))))
+;    (lambda (env) (make-procedure vars bproc env))))
+;
+;(define (analyze-sequence exprs)
+;  (define (sequentially proc1 proc2)
+;    (lambda (env) (proc1 env) (proc2 env)))
+;  (define (loop first-proc rest-procs)
+;    (if (null? rest-procs)
+;      (lambda (env) (first-proc env))
+;      (loop (sequentially first-proc (car rest-procs))
+;	    (cdr rest-procs))))
+;  (let ((procs (map analyze exprs)))
+;    (if (null? procs)
+;      (error "Empty sequence -- ANALYZE"))
+;    (loop (car procs) (cdr procs))))
+;
+;(define (analyze-application expr)
+;  (let ((fproc (analyze (operator expr)))
+;	(aprocs (map analyze (operands expr))))
+;    (lambda (env)
+;      (execute-application (fproc env)
+;			   (map (lambda (aproc) (aproc env)) aprocs)))))
+;
+;(define (execute-application proc args)
+;  (cond ((primitive-procedure? proc) (apply-primitive-procedure proc args))
+;	((compound-procedure? proc) ((procedure-body proc)
+;				     (extend-environment
+;				       (procedure-parameters proc)
+;				       args
+;				       (procedure-environment proc))))
+;	(else
+;	  (error "Unknown procedure type -- EXECUTE-APPLICATION" proc))))
 
 
 ; ----- Apply -----
 
 ; do-apply applies a procedure to a list of arguments
 
-;(define (do-apply procedure arguments)
-;  (cond ((primitive-procedure? procedure) (apply-primitive-procedure procedure arguments))
-;	((compound-procedure? procedure) (eval-sequence
-;					   (procedure-body procedure)
-;					   (extend-environment (procedure-parameters procedure)
-;							       arguments
-;							       (procedure-environment procedure))))
-;	(else (error "Unknown procedure type -- APPLY" procedure))))
+(define (do-apply procedure arguments)
+  (cond ((primitive-procedure? procedure) (apply-primitive-procedure procedure arguments))
+	((compound-procedure? procedure) (eval-sequence
+					   (procedure-body procedure)
+					   (extend-environment (procedure-parameters procedure)
+							       arguments
+							       (procedure-environment procedure))))
+	(else (error "Unknown procedure type -- APPLY" procedure))))
 
 ; A procedure is a compound expression built from various (possibly built-in)
 ; expressions.
@@ -670,32 +756,32 @@
 ; clauses directly define the variables in the current frame (with define-variable!). Then
 ; the sequence of sets and final expression will be simultaneous without an extra frame.
 
-(define (do-apply procedure arguments)
-  (cond ((primitive-procedure? procedure) (apply-primitive-procedure procedure arguments))
-	((compound-procedure? procedure)
-	 (let ((local-environment (extend-environment (procedure-parameters procedure)
-						      arguments
-						      (procedure-environment procedure))))
-	   (eval-sequence (procedure-body procedure local-environment) local-environment)))
-	(else (error "Unknown procedure type -- APPLY" procedure))))
-
-(define (procedure-body proc env)
-  (let ((body (caddr proc)))
-    (scan-out-defines body env)))
-
-(define (scan-out-defines body env)
-  (if (scan-out-has-defines body)
-    (begin
-      (scan-out-define-variables body env)
-      (append (scan-out-sets body) (scan-out-reduced-body body)))
-    body))
-
-(define (scan-out-define-variables body env)
-  (cond ((null? body) 'ok)
-	((definition? (car body)) (begin
-				    (define-variable! (definition-variable (car body)) '*unassigned* env)
-				    (scan-out-define-variables (cdr body) env)))
-	(else (scan-out-define-variables (cdr body) env))))
+;(define (do-apply procedure arguments)
+;  (cond ((primitive-procedure? procedure) (apply-primitive-procedure procedure arguments))
+;	((compound-procedure? procedure)
+;	 (let ((local-environment (extend-environment (procedure-parameters procedure)
+;						      arguments
+;						      (procedure-environment procedure))))
+;	   (eval-sequence (procedure-body procedure local-environment) local-environment)))
+;	(else (error "Unknown procedure type -- APPLY" procedure))))
+;
+;(define (procedure-body proc env)
+;  (let ((body (caddr proc)))
+;    (scan-out-defines body env)))
+;
+;(define (scan-out-defines body env)
+;  (if (scan-out-has-defines body)
+;    (begin
+;      (scan-out-define-variables body env)
+;      (append (scan-out-sets body) (scan-out-reduced-body body)))
+;    body))
+;
+;(define (scan-out-define-variables body env)
+;  (cond ((null? body) 'ok)
+;	((definition? (car body)) (begin
+;				    (define-variable! (definition-variable (car body)) '*unassigned* env)
+;				    (scan-out-define-variables (cdr body) env)))
+;	(else (scan-out-define-variables (cdr body) env))))
 
 ; - Exercise 4.18
 ; In both strategies, u and v are added to the local frame and may be referenced by the following
@@ -767,13 +853,47 @@
 
 ; b) 
 
-((lambda (even? odd?)
+((lambda (even? odd? x)
    (even? even? odd? x))
  (lambda (ev? od? n)
    (if (= n 0) true (od? ev? od? (- n 1))))
  (lambda (ev? od? n)
    (if (= n 0) false (ev? ev? od? (- n 1))))
  10)
+
+; - Exercise 4.22
+
+; See analysis method.
+; Implemented as derived function.
+
+; - Exercise 4.23
+
+; The version of the text performs a greater amount of analysis of the expression. It fully creates a
+; lambda function by chaining together the procedure sequence via the sequentially method. The result
+; is a single lambda function fully independent of the analysis machinery.
+; Alyssa's version gives a lambda which wraps the execute-sequence function. This function loops
+; through and does further analyze calls on the method. Thus it returns a lambda that is still
+; dependent on analysis machinery, and not a fully analyzed function.
+
+; - Exercise 4.24
+
+; Using a recursive function to force many evaluation calls with simple primitive procedures:
+;
+; (define (fib n) (if (< n 2) 1 (+ (fib (- n 1)) (fib (- n 2)))))
+; 
+; Real time
+; n	With Analysis	Without Analysis
+; 1	0.156s		0.153s
+; 5	0.131s		0.132s
+; 10	0.172s		0.183s
+; 15	0.338s		0.497s
+; 20	2.229s		3.390s
+; 25	22.273s		41.398s
+; 30	4m8.62s		7m38.2s
+;
+; We can see that analysis speeds up the program by reducing syntactic evaluation for repeated calls.
+; For only a few number of calls, there's little difference (< 15). At ~15 calls we see the speed
+; improvement start to become significant.
 
 ; -----------------------------------------------------------------------------------------------------
 

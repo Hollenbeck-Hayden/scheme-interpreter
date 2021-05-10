@@ -7,5 +7,10 @@ of what needs to be done).
 Of course, these are just my own answers and not checked against anything. I've tested most of them against
 basic cases, and I try to maintain changes and make sure they still work while adding extra features.
 
+Using the MIT Scheme evaluator on Arch. To run the evaluator with an input script, use
+```
+scheme --load evaluator.scm < test.scm
+```
+
 Completed exercises:
- - 4.1 - 4.21
+ - Chapter 4.1: 4.1 - 4.24
